@@ -27,5 +27,34 @@
     "deal_price": 2999,
     "discount_pct": 32,
     "posted_at": "2026-09-20T09:08:03.755947+00:00"
+  },
+  {
+    "slug": "8bitdo-ultimate-c-2-4g-wireless-controller-field-green",
+    "title": "8BitDo Ultimate C 2.4G Wireless Controller (Field Green)",
+    "meta_description": "Buy 8BitDo Ultimate C 2.4G Wireless Controller with Hall Effect Joysticks for PC & Steam Deck at a great deal price on Amazon India.",
+    "specs": [
+      "2.4G wireless connection with low latency via USB dongle",
+      "Hall Effect joysticks to prevent stick drift issues",
+      "Compatible with Windows PC, Android, Raspberry Pi, and Steam Deck",
+      "Rechargeable battery providing up to 25 hours of play time",
+      "Textured tactile grip and classic accurate D-pad design"
+    ],
+    "pros": [
+      "Hall Effect sensors ensure long-term durability without joystick drift",
+      "Ergonomic build quality with comfortable grip for long gaming sessions",
+      "Seamless plug-and-play setup for PC and Steam Deck gaming",
+      "Outstanding performance and build quality for this price range"
+    ],
+    "cons": [
+      "Lacks Bluetooth connectivity, depends on the included 2.4G USB receiver",
+      "Does not support iOS or macOS officially"
+    ],
+    "telugu_tip": "PC లేదా Steam Deck లో గంటల తరబడి గేమింగ్ చేసేవారికి ఇది చాలా మంచి కంట్రోలర్. హాల్ ఎఫెక్ట్ జాయ్‌స్టిక్స్ ఉండటం వల్ల జాయ్‌స్టిక్ స్టిక్ డ్రిఫ్ట్ సమస్య అసలు రాదు. తక్కువ బడ్జెట్‌లో ప్రీమియం వైర్‌లెస్ గేమ్‌ప్యాడ్ కావాలనుకునేవారు ఇది నిరభ్యంతరంగా తీసుకోవచ్చు.",
+    "image_url": "https://m.media-amazon.com/images/I/61-v8aK-76L._SL1500_.jpg",
+    "affiliate_url": "https://www.amazon.in/dp/B0C8V4J2KC?tag=successmate-21",
+    "original_price": 4999,
+    "deal_price": 2499,
+    "discount_pct": 50,
+    "posted_at": "2026-09-20T09:24:51.710732+00:00"
   }
 ]
