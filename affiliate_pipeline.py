@@ -156,31 +156,36 @@ def build_telegram_text(enriched, affiliate_url, deal_price, original_price, dis
     )
 
 
+def _post_telegram(base, method, payload):
+    r = requests.post(f"{base}/{method}", data=payload, timeout=20)
+    if not r.ok:
+        # Telegram's actual reason lives in the response body, not the status line.
+        raise RuntimeError(f"Telegram {method} failed: HTTP {r.status_code} — {r.text}")
+    return r.json()
+
+
 def send_telegram(image_url, text):
     base = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
     def call():
         if image_url and len(text) <= TELEGRAM_CAPTION_LIMIT:
-            r = requests.post(f"{base}/sendPhoto", data={
+            return _post_telegram(base, "sendPhoto", {
                 "chat_id": TELEGRAM_CHAT_ID, "photo": image_url,
                 "caption": text, "parse_mode": "HTML",
-            }, timeout=20)
+            })
         elif image_url:
-            r = requests.post(f"{base}/sendPhoto", data={
+            _post_telegram(base, "sendPhoto", {
                 "chat_id": TELEGRAM_CHAT_ID, "photo": image_url,
-            }, timeout=20)
-            r.raise_for_status()
-            r = requests.post(f"{base}/sendMessage", data={
+            })
+            return _post_telegram(base, "sendMessage", {
                 "chat_id": TELEGRAM_CHAT_ID, "text": text,
                 "parse_mode": "HTML", "disable_web_page_preview": False,
-            }, timeout=20)
+            })
         else:
-            r = requests.post(f"{base}/sendMessage", data={
+            return _post_telegram(base, "sendMessage", {
                 "chat_id": TELEGRAM_CHAT_ID, "text": text,
                 "parse_mode": "HTML",
-            }, timeout=20)
-        r.raise_for_status()
-        return r.json()
+            })
 
     return retry(call, what="Telegram post")
 
