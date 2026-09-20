@@ -13,7 +13,7 @@ import time
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode, quote, unquote
 
 import requests
 from jinja2 import Environment, FileSystemLoader
@@ -75,6 +75,16 @@ def unique_slug(base, existing_slugs):
         slug = f"{base}-{i}"
         i += 1
     return slug
+
+
+def normalize_url(url):
+    """Re-encode the path portion properly. Copy-pasted URLs sometimes carry
+    literal special characters (e.g. a raw '+') that should be percent-encoded
+    — unquote first so we don't double-encode an already-correct URL, then
+    quote so any raw special character gets encoded exactly once."""
+    parts = urlsplit(url)
+    safe_path = quote(unquote(parts.path), safe="/")
+    return urlunsplit((parts.scheme, parts.netloc, safe_path, parts.query, parts.fragment))
 
 
 def add_affiliate_tag(url, tag):
@@ -188,7 +198,8 @@ def download_image(image_url):
     for headers in header_variants:
         try:
             r = requests.get(image_url, headers=headers, timeout=20, allow_redirects=True)
-            r.raise_for_status()
+            if not r.ok:
+                raise RuntimeError(f"HTTP {r.status_code} fetching image — body: {r.text[:200]!r}")
             content_type = r.headers.get("Content-Type", "")
             if "image" not in content_type:
                 raise RuntimeError(f"URL did not return an image (Content-Type: {content_type})")
@@ -249,7 +260,8 @@ def process_deal(raw_deal, existing_slugs):
     original_price = int(raw_deal["original_price"])
     deal_price = int(raw_deal["deal_price"])
     discount_pct = round((1 - deal_price / original_price) * 100) if original_price else 0
-    affiliate_url = add_affiliate_tag(raw_deal["product_url"], AFFILIATE_TAG)
+    affiliate_url = add_affiliate_tag(normalize_url(raw_deal["product_url"]), AFFILIATE_TAG)
+    image_url = normalize_url(raw_deal["image_url"])
 
     slug = unique_slug(slugify(enriched["clean_title"]), existing_slugs)
 
@@ -261,7 +273,7 @@ def process_deal(raw_deal, existing_slugs):
         "pros": enriched["pros"],
         "cons": enriched["cons"],
         "telugu_tip": enriched["telugu_tip"],
-        "image_url": raw_deal["image_url"],
+        "image_url": image_url,
         "affiliate_url": affiliate_url,
         "original_price": original_price,
         "deal_price": deal_price,
@@ -271,7 +283,7 @@ def process_deal(raw_deal, existing_slugs):
 
     # Telegram
     tg_text = build_telegram_text(enriched, affiliate_url, deal_price, original_price, discount_pct)
-    send_telegram(raw_deal["image_url"], tg_text)
+    send_telegram(image_url, tg_text)
     log(f"Posted to Telegram: {deal_record['title']}")
 
     return deal_record
