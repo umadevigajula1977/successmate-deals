@@ -166,15 +166,36 @@ def _post_telegram(base, method, payload, files=None):
 
 def download_image(image_url):
     """Amazon's CDN blocks Telegram's own server from hotlinking the image
-    (no browser-like User-Agent), so we fetch the bytes ourselves and upload
-    them to Telegram directly instead of passing the URL."""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    r = requests.get(image_url, headers=headers, timeout=20)
-    r.raise_for_status()
-    content_type = r.headers.get("Content-Type", "")
-    if "image" not in content_type:
-        raise RuntimeError(f"URL did not return an image (Content-Type: {content_type})")
-    return r.content
+    (no browser-like headers), so we fetch the bytes ourselves and upload
+    them to Telegram directly instead of passing the URL. Tries a couple of
+    realistic header sets before giving up — a genuinely dead/placeholder
+    URL will still correctly fail after this."""
+    header_variants = [
+        {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "Accept-Language": "en-IN,en;q=0.9",
+            "Referer": "https://www.amazon.in/",
+        },
+        {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                          "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+            "Accept": "*/*",
+        },
+    ]
+    last_err = None
+    for headers in header_variants:
+        try:
+            r = requests.get(image_url, headers=headers, timeout=20, allow_redirects=True)
+            r.raise_for_status()
+            content_type = r.headers.get("Content-Type", "")
+            if "image" not in content_type:
+                raise RuntimeError(f"URL did not return an image (Content-Type: {content_type})")
+            return r.content
+        except Exception as e:
+            last_err = e
+    raise last_err
 
 
 def send_telegram(image_url, text):
