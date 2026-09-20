@@ -1,0 +1,52 @@
+name: Deals Pipeline
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours, UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  run-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
+        run: python affiliate_pipeline.py
+
+      - name: Commit updated data back to repo
+        run: |
+          git config user.name "successmate-deals-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/deals_list.json data/pending_deals.json
+          git diff --cached --quiet || git commit -m "Update deals data [skip ci]"
+          git push
+
+      - name: Deploy output/ to Hostinger via rsync
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p 65002 82.25.107.203 >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -avz --exclude '.git*' \
+            -e "ssh -p 65002 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+            output/ u386985095@82.25.107.203:~/domains/successmate.in/public_html/deals/

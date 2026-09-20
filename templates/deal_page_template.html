@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ title }} – {{ discount_pct }}% Off Deal | SuccessMate Deals</title>
+<meta name="description" content="{{ meta_description }}">
+<link rel="canonical" href="https://successmate.in/deals/{{ slug }}.html">
+<meta name="theme-color" content="#0b0f1a">
+<link rel="manifest" href="/deals/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:title" content="{{ title }} – {{ discount_pct }}% Off">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:image" content="{{ image_url }}">
+<meta property="og:type" content="product">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2917592456203617" crossorigin="anonymous"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-38L8QE6SXM"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-38L8QE6SXM');
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": {{ title|tojson }},
+  "image": {{ image_url|tojson }},
+  "description": {{ meta_description|tojson }},
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "INR",
+    "price": "{{ deal_price }}",
+    "availability": "https://schema.org/InStock",
+    "url": {{ affiliate_url|tojson }}
+  }
+}
+</script>
+<style>
+:root{
+  --bg:#0b0f1a; --card:#131a2b; --border:#232c42;
+  --text:#f1f4f9; --muted:#93a0bd;
+  --accent:#EF4444; --accent2:#F97316;
+  --price:#22C55E; --gold:#FFB800;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Telugu",sans-serif;
+  padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0);}
+img{max-width:100%;display:block}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px 100px}
+header{position:sticky;top:0;top:env(safe-area-inset-top,0);z-index:20;background:rgba(11,15,26,.92);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 14px;display:flex;align-items:center;gap:10px}
+header a{color:var(--text);text-decoration:none;font-weight:800;font-size:17px}
+header a span{color:var(--accent2)}
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;font-weight:700;
+  font-size:12px;padding:5px 10px;border-radius:999px;margin:14px 0 8px}
+.hero{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:10px}
+.hero img{width:100%;aspect-ratio:1/1;object-fit:contain;background:#fff}
+.pad{padding:16px}
+h1{font-size:20px;line-height:1.35;margin-bottom:10px}
+.price-row{display:flex;align-items:baseline;gap:10px;margin:8px 0 4px}
+.deal-price{font-size:28px;font-weight:800;color:var(--price)}
+.orig-price{font-size:15px;color:var(--muted);text-decoration:line-through}
+.discount{color:var(--gold);font-weight:700;font-size:14px}
+.specs{list-style:none;margin:14px 0}
+.specs li{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14.5px}
+.specs li:last-child{border-bottom:none}
+.specs li:before{content:"✓";color:var(--price);font-weight:800}
+.section-title{font-size:15px;font-weight:800;margin:20px 0 10px;color:var(--gold)}
+.pros,.cons{list-style:none;margin-bottom:6px}
+.pros li,.cons li{font-size:14.5px;padding:6px 0;display:flex;gap:8px}
+.pros li:before{content:"👍";flex-shrink:0}
+.cons li:before{content:"⚠️";flex-shrink:0}
+.tip-box{background:linear-gradient(135deg,#1a1030,#241536);border:1px solid #3b2158;border-radius:14px;
+  padding:14px;margin-top:18px;font-size:14.5px;line-height:1.6}
+.tip-box b{color:var(--gold)}
+.ad-slot{margin:18px 0;min-height:90px;display:flex;align-items:center;justify-content:center;
+  background:var(--card);border:1px dashed var(--border);border-radius:10px;font-size:12px;color:var(--muted)}
+.disclosure{font-size:11.5px;color:var(--muted);margin-top:16px;line-height:1.5}
+.cta-bar{position:fixed;left:0;right:0;bottom:0;bottom:env(safe-area-inset-bottom,0);z-index:30;
+  background:rgba(11,15,26,.97);backdrop-filter:blur(8px);border-top:1px solid var(--border);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0))}
+.cta-inner{max-width:640px;margin:0 auto}
+.buy-btn{display:block;width:100%;text-align:center;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:12px;text-decoration:none}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){--bg:#0b0f1a;--text:#f1f4f9} }
+</style>
+</head>
+<body>
+<header><a href="/deals/">SuccessMate<span>Deals</span></a></header>
+<div class="wrap">
+  <div class="badge">🔥 {{ discount_pct }}% OFF · Verified Deal</div>
+  <div class="hero">
+    <img src="{{ image_url }}" alt="{{ title }}" loading="eager">
+  </div>
+  <div class="pad">
+    <h1>{{ title }}</h1>
+    <div class="price-row">
+      <span class="deal-price">₹{{ deal_price }}</span>
+      <span class="orig-price">₹{{ original_price }}</span>
+      <span class="discount">Save {{ discount_pct }}%</span>
+    </div>
+
+    <div class="section-title">Key Specs</div>
+    <ul class="specs">
+      {% for spec in specs %}<li>{{ spec }}</li>{% endfor %}
+    </ul>
+
+    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-2917592456203617" data-ad-slot="3113183803" data-ad-format="auto" data-full-width-responsive="true"></ins>
+
+    <div class="section-title">Why we like it</div>
+    <ul class="pros">{% for p in pros %}<li>{{ p }}</li>{% endfor %}</ul>
+
+    <div class="section-title">Know before you buy</div>
+    <ul class="cons">{% for c in cons %}<li>{{ c }}</li>{% endfor %}</ul>
+
+    <div class="tip-box"><b>తెలుగులో సలహా:</b><br>{{ telugu_tip }}</div>
+
+    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-2917592456203617" data-ad-slot="3113183803" data-ad-format="auto" data-full-width-responsive="true"></ins>
+
+    <p class="disclosure">As an Amazon Associate, SuccessMate earns from qualifying purchases. Price and availability shown were accurate at the time of posting and may change on Amazon.</p>
+  </div>
+</div>
+<div class="cta-bar"><div class="cta-inner">
+  <a class="buy-btn" href="{{ affiliate_url }}" target="_blank" rel="nofollow sponsored noopener">Buy Now on Amazon →</a>
+</div></div>
+<script>
+window.addEventListener('DOMContentLoaded',function(){
+  try{(adsbygoogle=window.adsbygoogle||[]).push({});(adsbygoogle=window.adsbygoogle||[]).push({});}catch(e){}
+});
+</script>
+</body>
+</html>
