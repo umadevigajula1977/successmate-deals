@@ -46,7 +46,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p 65002 82.25.107.203 >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -p 65002 82.25.107.203 >> ~/.ssh/known_hosts || true
+          ssh -p 65002 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+            u386985095@82.25.107.203 "mkdir -p ~/domains/successmate.in/public_html/deals"
           rsync -avz --exclude '.git*' \
             -e "ssh -p 65002 -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
             output/ u386985095@82.25.107.203:~/domains/successmate.in/public_html/deals/
