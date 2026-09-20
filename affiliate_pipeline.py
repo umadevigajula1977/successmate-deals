@@ -117,7 +117,7 @@ Return ONLY valid JSON (no markdown fences, no commentary) with exactly these ke
   "cons": ["1 to 3 short honest cons or things to check before buying"],
   "meta_description": "1 sentence, under 155 chars, for SEO meta description",
   "telugu_tip": "2 to 3 sentences in natural Telugu script giving a genuine buying tip or who this product suits best",
-  "telegram_caption": "A Telegram post: English product highlights with 1-2 emojis, then a line starting with '💡 తెలుగులో సలహా:' with a short Telugu tip, then a call to action line. Do NOT include the URL or price in this field, those are added separately. Keep it under 700 characters."
+  "telegram_caption": "A SHORT, punchy Telegram deal alert. Product name + 1 emoji, then exactly 2 key highlights as short phrases (not full sentences), then one line starting with '💡 తెలుగులో:' with a 1-line Telugu tip. Do NOT include the URL or price in this field, those are added separately. Hard limit: 250 characters total."
 }}
 The pros/cons and telugu_tip must be original analysis, not copied Amazon marketing text — this is required for Amazon Associates policy compliance."""
 
@@ -198,12 +198,12 @@ def send_telegram(image_url, text):
                 files={"photo": ("deal.jpg", image_bytes)})
             return _post_telegram(base, "sendMessage", {
                 "chat_id": TELEGRAM_CHAT_ID, "text": text,
-                "parse_mode": "HTML", "disable_web_page_preview": False,
+                "parse_mode": "HTML", "disable_web_page_preview": True,
             })
         else:
             return _post_telegram(base, "sendMessage", {
                 "chat_id": TELEGRAM_CHAT_ID, "text": text,
-                "parse_mode": "HTML",
+                "parse_mode": "HTML", "disable_web_page_preview": True,
             })
 
     return retry(call, what="Telegram post")
