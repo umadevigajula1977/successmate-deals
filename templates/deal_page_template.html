@@ -93,7 +93,7 @@ h1{font-size:20px;line-height:1.35;margin-bottom:10px}
 <div class="wrap">
   <div class="badge">🔥 {{ discount_pct }}% OFF · Verified Deal</div>
   <div class="hero">
-    <img src="{{ image_url }}" alt="{{ title }}" loading="eager">
+    <img src="{{ image_url }}" alt="{{ title }}" loading="eager" onerror="this.onerror=null;this.src='/deals/placeholder.svg';">
   </div>
   <div class="pad">
     <h1>{{ title }}</h1>
