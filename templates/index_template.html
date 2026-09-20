@@ -69,7 +69,7 @@ header nav a{font-size:13px;color:var(--muted);margin-left:14px}
   <div class="grid" id="grid">
     {% for d in deals %}
     <a class="card" href="/deals/{{ d.slug }}.html" data-name="{{ d.title|lower }}">
-      <img src="{{ d.image_url }}" alt="{{ d.title }}" loading="lazy" onerror="this.onerror=null;this.src='/deals/placeholder.svg';">
+      <img src="{{ d.image_url }}" alt="{{ d.title }}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/deals/placeholder.svg';">
       <div class="cp">
         <span class="disc">{{ d.discount_pct }}% OFF</span>
         <h3>{{ d.title }}</h3>
