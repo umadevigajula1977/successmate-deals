@@ -156,27 +156,46 @@ def build_telegram_text(enriched, affiliate_url, deal_price, original_price, dis
     )
 
 
-def _post_telegram(base, method, payload):
-    r = requests.post(f"{base}/{method}", data=payload, timeout=20)
+def _post_telegram(base, method, payload, files=None):
+    r = requests.post(f"{base}/{method}", data=payload, files=files, timeout=30)
     if not r.ok:
         # Telegram's actual reason lives in the response body, not the status line.
         raise RuntimeError(f"Telegram {method} failed: HTTP {r.status_code} — {r.text}")
     return r.json()
 
 
+def download_image(image_url):
+    """Amazon's CDN blocks Telegram's own server from hotlinking the image
+    (no browser-like User-Agent), so we fetch the bytes ourselves and upload
+    them to Telegram directly instead of passing the URL."""
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    r = requests.get(image_url, headers=headers, timeout=20)
+    r.raise_for_status()
+    content_type = r.headers.get("Content-Type", "")
+    if "image" not in content_type:
+        raise RuntimeError(f"URL did not return an image (Content-Type: {content_type})")
+    return r.content
+
+
 def send_telegram(image_url, text):
     base = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
+    image_bytes = None
+    if image_url:
+        try:
+            image_bytes = retry(download_image, image_url, what="Image download")
+        except Exception as e:
+            log(f"Could not fetch product image, posting as text-only: {e}")
+
     def call():
-        if image_url and len(text) <= TELEGRAM_CAPTION_LIMIT:
-            return _post_telegram(base, "sendPhoto", {
-                "chat_id": TELEGRAM_CHAT_ID, "photo": image_url,
-                "caption": text, "parse_mode": "HTML",
-            })
-        elif image_url:
-            _post_telegram(base, "sendPhoto", {
-                "chat_id": TELEGRAM_CHAT_ID, "photo": image_url,
-            })
+        if image_bytes and len(text) <= TELEGRAM_CAPTION_LIMIT:
+            return _post_telegram(base, "sendPhoto",
+                {"chat_id": TELEGRAM_CHAT_ID, "caption": text, "parse_mode": "HTML"},
+                files={"photo": ("deal.jpg", image_bytes)})
+        elif image_bytes:
+            _post_telegram(base, "sendPhoto",
+                {"chat_id": TELEGRAM_CHAT_ID},
+                files={"photo": ("deal.jpg", image_bytes)})
             return _post_telegram(base, "sendMessage", {
                 "chat_id": TELEGRAM_CHAT_ID, "text": text,
                 "parse_mode": "HTML", "disable_web_page_preview": False,
