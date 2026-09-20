@@ -39,6 +39,7 @@ AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "successmate-21")
 GEMINI_MODEL = "gemini-3.6-flash"
 MAX_RETRIES = 3
 TELEGRAM_CAPTION_LIMIT = 1024
+SITE_BASE_URL = "https://successmate.in/deals"
 
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
@@ -156,12 +157,12 @@ def escape_html(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def build_telegram_text(enriched, affiliate_url, deal_price, original_price, discount_pct):
+def build_telegram_text(enriched, deal_page_url, deal_price, original_price, discount_pct):
     caption = escape_html(enriched["telegram_caption"])
     return (
         f"{caption}\n\n"
         f"💰 <b>₹{deal_price}</b> <s>₹{original_price}</s> ({discount_pct}% OFF)\n"
-        f"👉 {affiliate_url}\n\n"
+        f"👉 పూర్తి వివరాలు & బెస్ట్ ఆఫర్ కొరకు క్లిక్ చేయండి: {deal_page_url}\n\n"
         f"<i>As an Amazon Associate, SuccessMate earns from qualifying purchases.</i>"
     )
 
@@ -281,8 +282,9 @@ def process_deal(raw_deal, existing_slugs):
         "posted_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Telegram
-    tg_text = build_telegram_text(enriched, affiliate_url, deal_price, original_price, discount_pct)
+    # Telegram — link goes to OUR deal page (ads + full content), not straight to Amazon
+    deal_page_url = f"{SITE_BASE_URL}/{slug}.html"
+    tg_text = build_telegram_text(enriched, deal_page_url, deal_price, original_price, discount_pct)
     send_telegram(image_url, tg_text)
     log(f"Posted to Telegram: {deal_record['title']}")
 
