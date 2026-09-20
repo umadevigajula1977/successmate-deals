@@ -2,7 +2,9 @@ name: Deals Pipeline
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # every 6 hours, UTC
+    - cron: "30 3 * * *"   # 9:00 AM IST
+    - cron: "0 8 * * *"    # 1:30 PM IST
+    - cron: "0 15 * * *"   # 8:30 PM IST
   workflow_dispatch: {}
 
 permissions:
