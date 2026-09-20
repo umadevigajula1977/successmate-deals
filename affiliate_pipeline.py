@@ -254,6 +254,28 @@ def render_index(deals):
     return tpl.render(deals=ordered)
 
 
+def generate_sitemap(deals):
+    """Simple sitemap.xml covering the deals index + every live deal page.
+    Deployed to public_html/deals/sitemap.xml alongside the pages."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    urls = [(f"{SITE_BASE_URL}/", today, "1.0")]
+    for d in deals:
+        lastmod = d.get("posted_at", "")[:10] or today
+        urls.append((f"{SITE_BASE_URL}/{d['slug']}.html", lastmod, "0.8"))
+
+    entries = "\n".join(
+        f"  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>"
+        f"\n    <priority>{priority}</priority>\n  </url>"
+        for loc, lastmod, priority in urls
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{entries}\n"
+        "</urlset>\n"
+    )
+
+
 # ---------- main ----------
 def process_deal(raw_deal, existing_slugs):
     enriched = enrich_with_gemini(raw_deal)
@@ -323,6 +345,7 @@ def main():
         (OUTPUT_DIR / f"{d['slug']}.html").write_text(html, encoding="utf-8")
 
     (OUTPUT_DIR / "index.html").write_text(render_index(deals), encoding="utf-8")
+    (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(deals), encoding="utf-8")
 
     save_json(DEALS_FILE, deals)
     save_json(PENDING_FILE, still_pending)
