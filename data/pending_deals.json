@@ -1,19 +1,5 @@
 [
   {
-    "product_url": "https://www.amazon.in/dp/B083C65LLC",
-    "image_url": "https://m.media-amazon.com/images/I/91yImSuEPTL._SX679_.jpg",
-    "original_price": 999,
-    "deal_price": 399,
-    "raw_text": "Symbol Women Cotton Calf Length Regular Fit Nighty | Night Dress (Available in Plus Sizes)"
-  },
-  {
-    "product_url": "https://www.amazon.in/dp/B09GYTHKGW",
-    "image_url": "https://m.media-amazon.com/images/I/71-YA2StNoL._SY695_.jpg",
-    "original_price": 1599,
-    "deal_price": 399,
-    "raw_text": "Lavie Women's Small Bifold Purse | Ladies 2 Fold Wallet"
-  },
-  {
     "product_url": "https://www.amazon.in/dp/B0CXNSCCVW",
     "image_url": "https://m.media-amazon.com/images/I/61K8wOHMIXL._SX679_.jpg",
     "original_price": 430,
@@ -28,24 +14,10 @@
     "raw_text": "FLYNGO Umbrella for Rain Big Size with Carabiner Handle, UV Coated 3-Fold Travel Umbrella for Sun Protection, Windproof Reinforced 10 Dual Ribs, Automatic Open/Close"
   },
   {
-    "product_url": "https://www.amazon.in/dp/B0HH77N1XN",
-    "image_url": "https://m.media-amazon.com/images/I/71tC83BmoTL._SX522_.jpg",
-    "original_price": 2999,
-    "deal_price": 1499,
-    "raw_text": "Bionic Heated Massager, Wireless Portable Shiatsu Neck and Back Massager, Electric Deep Tissue 4D Kneading Massage, Simulated Hand Design for Pain Relief and Muscle Relax (KL3)"
-  },
-  {
     "product_url": "https://www.amazon.in/dp/B00YUNKKP8",
     "image_url": "https://m.media-amazon.com/images/I/41pEWtWfxbL._SY300_SX300_QL70_ML2_.jpg",
     "original_price": 199,
     "deal_price": 177,
     "raw_text": "Hit Anti Roach Gel - Cockroach Killer (20G) | Kitchen Safe | Odourless | Fast And Convenient, Pack Of 1"
-  },
-  {
-    "product_url": "https://www.amazon.in/dp/B0C5N17D74",
-    "image_url": "https://m.media-amazon.com/images/S/aplus-media-library-service-media/819f700f-dabd-4c3d-98d9-30befa1c664c.__CR0,0,970,600_PT0_SX970_V1___.jpg",
-    "original_price": 3200,
-    "deal_price": 599,
-    "raw_text": "Dr Trust USA Platinum Rechargeable Digital Electronic Weight Machine, CE approved with 3 Years Warranty, Human Body 180Kg Capacity, Tempered Glass, Large LCD Display Personal Weighing Scale - 501"
   }
 ]
