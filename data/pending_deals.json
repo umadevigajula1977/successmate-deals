@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "product_url": "https://www.amazon.in/dp/B0GPN9R146",
+    "image_url": "https://m.media-amazon.com/images/I/51y6ZRXvr1L._SL1000_.jpg",
+    "original_price": 299,
+    "deal_price": 248,
+    "raw_text": "Happi Planet Magic Eraser | Pack of 4 | No Scratch Multi-Surface Cleaning Sponge | Removes 100+ Tough Stains | Just Add Water | Walls, Kitchen, Bathroom, Shoes & Switch Boards"
+  },
+  {
+    "product_url": "https://www.amazon.in/dp/B0GJCPCJGH",
+    "image_url": "https://m.media-amazon.com/images/I/916zJzP7PFL._SL1500_.jpg",
+    "original_price": 1499,
+    "deal_price": 789,
+    "raw_text": "VGRASSP Remote Control Rock Crawler Monster Truck Toy for Kids with Mist Spray - Rechargeable Off-Road All Terrain RC Smoke Car with Safe Charging - Color As Per Stock"
+  },
+  {
+    "product_url": "https://www.amazon.in/dp/B0CXM5DT52",
+    "image_url": "https://m.media-amazon.com/images/I/61aOHE6T76L.jpg",
+    "original_price": 599,
+    "deal_price": 260,
+    "raw_text": "SOFTSPUN Microfiber Cleaning Cloths, 10pcs 40x40cms 220 GSM Multi-Colour! Highly Absorbent Lint and Streak Free Multi -Purpose Wash Cloth for Kitchen Window Stainless Steel Silverware."
+  },
+  {
+    "product_url": "https://www.amazon.in/dp/B0G2GMN5JZ",
+    "image_url": "https://m.media-amazon.com/images/I/71-weAkbbPL._SL1500_.jpg",
+    "original_price": 3499,
+    "deal_price": 799,
+    "raw_text": "Mivi DuoPods Sync in Ear Earbuds | 60H Playtime Bluetooth Earphones Wireless | Earbuds ENC for Clear Calls | 13mm Drivers Ear Buds Wireless | Gaming Mode | BT 5.3 TWS ENC Earbuds Style | Earpods"
+  }
+]
