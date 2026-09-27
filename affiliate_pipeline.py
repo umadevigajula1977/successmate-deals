@@ -40,6 +40,8 @@ GEMINI_MODEL = "gemini-3.6-flash"
 MAX_RETRIES = 3
 TELEGRAM_CAPTION_LIMIT = 1024
 SITE_BASE_URL = "https://successmate.in/deals"
+MAX_DEALS_PER_RUN = 5          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
+GEMINI_CALL_DELAY_SEC = 8      # spacing between calls within a run (helps RPM limits)
 
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
@@ -48,13 +50,31 @@ def log(msg):
     print(f"[{datetime.now(timezone.utc).isoformat()}] {msg}", flush=True)
 
 
+class QuotaExhausted(Exception):
+    """Raised when the Gemini free-tier daily/rate quota is hit. Retrying
+    immediately won't help — the whole run should stop and wait for the
+    next scheduled trigger instead of burning through the pending queue."""
+    pass
+
+
+def _is_quota_error(e):
+    msg = str(e)
+    return "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower()
+
+
 def retry(fn, *args, what="call", **kwargs):
-    """Simple exponential-backoff retry: 2s, 4s, 8s."""
+    """Simple exponential-backoff retry: 2s, 4s, 8s. Quota errors skip the
+    backoff entirely and raise QuotaExhausted immediately — waiting a few
+    seconds never helps against a daily quota, so failing fast preserves
+    the remaining retry budget for genuinely transient errors."""
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             return fn(*args, **kwargs)
         except Exception as e:
+            if _is_quota_error(e):
+                log(f"{what}: Gemini quota exhausted, stopping this run early: {e}")
+                raise QuotaExhausted(str(e)) from e
             last_err = e
             log(f"{what} failed (attempt {attempt}/{MAX_RETRIES}): {e}")
             if attempt < MAX_RETRIES:
@@ -322,21 +342,37 @@ def main():
     deals = load_json(DEALS_FILE, [])
     existing_slugs = {d["slug"] for d in deals}
 
+    batch = pending[:MAX_DEALS_PER_RUN]
+    overflow = pending[MAX_DEALS_PER_RUN:]  # untouched, waits for a later run
     if not pending:
         log("No pending deals. Regenerating output from existing catalog only.")
     else:
-        log(f"{len(pending)} pending deal(s) to process.")
+        log(f"{len(pending)} pending deal(s) queued; processing up to {len(batch)} this run "
+            f"(cap: {MAX_DEALS_PER_RUN}/run).")
 
     still_pending = []
-    for raw_deal in pending:
+    quota_hit = False
+    for i, raw_deal in enumerate(batch):
+        if quota_hit:
+            still_pending.append(raw_deal)
+            continue
         try:
             record = process_deal(raw_deal, existing_slugs)
             deals.append(record)
             existing_slugs.add(record["slug"])
-            time.sleep(2)  # gentle pacing between Gemini/Telegram calls
+            if i < len(batch) - 1:
+                time.sleep(GEMINI_CALL_DELAY_SEC)  # spacing between calls, helps RPM limits
+        except QuotaExhausted:
+            quota_hit = True
+            still_pending.append(raw_deal)
         except Exception as e:
             log(f"FAILED to process deal ({raw_deal.get('product_url')}): {e}")
             still_pending.append(raw_deal)  # keep for next run / manual review
+
+    if quota_hit:
+        log(f"Gemini quota hit — {len(still_pending)} batch item(s) deferred, "
+            f"plus {len(overflow)} already-queued overflow item(s).")
+    still_pending.extend(overflow)
 
     # Render all deal pages fresh from the catalog (cheap, no API calls)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
