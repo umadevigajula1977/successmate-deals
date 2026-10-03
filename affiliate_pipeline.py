@@ -42,6 +42,7 @@ TELEGRAM_CAPTION_LIMIT = 1024
 SITE_BASE_URL = "https://successmate.in/deals"
 MAX_DEALS_PER_RUN = 5          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
 GEMINI_CALL_DELAY_SEC = 8      # spacing between calls within a run (helps RPM limits)
+MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # weak deals are never published
 
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
@@ -54,6 +55,13 @@ class QuotaExhausted(Exception):
     """Raised when the Gemini free-tier daily/rate quota is hit. Retrying
     immediately won't help — the whole run should stop and wait for the
     next scheduled trigger instead of burning through the pending queue."""
+    pass
+
+
+class WeakDeal(Exception):
+    """Raised when a pending deal's discount is below MIN_DISCOUNT_PCT.
+    Rejected BEFORE Gemini enrichment (saves quota), never rendered,
+    never posted, and dropped from the pending queue."""
     pass
 
 
@@ -96,6 +104,18 @@ def unique_slug(base, existing_slugs):
         slug = f"{base}-{i}"
         i += 1
     return slug
+
+
+def calc_discount_pct(original_price, deal_price):
+    return round((1 - deal_price / original_price) * 100) if original_price else 0
+
+
+def is_live(deal):
+    """A catalog deal is live (page, index, sitemap) only if it meets the cutoff."""
+    try:
+        return int(deal.get("discount_pct", 0)) >= MIN_DISCOUNT_PCT
+    except (TypeError, ValueError):
+        return False
 
 
 def normalize_url(url):
@@ -298,11 +318,16 @@ def generate_sitemap(deals):
 
 # ---------- main ----------
 def process_deal(raw_deal, existing_slugs):
-    enriched = enrich_with_gemini(raw_deal)
-
     original_price = int(raw_deal["original_price"])
     deal_price = int(raw_deal["deal_price"])
-    discount_pct = round((1 - deal_price / original_price) * 100) if original_price else 0
+    discount_pct = calc_discount_pct(original_price, deal_price)
+
+    # Cutoff check FIRST: no Gemini call, no page, no Telegram for weak deals.
+    if discount_pct < MIN_DISCOUNT_PCT:
+        raise WeakDeal(f"{discount_pct}% off is below the {MIN_DISCOUNT_PCT}% minimum")
+
+    enriched = enrich_with_gemini(raw_deal)
+
     affiliate_url = add_affiliate_tag(normalize_url(raw_deal["product_url"]), AFFILIATE_TAG)
     image_url = normalize_url(raw_deal["image_url"])
 
@@ -352,6 +377,7 @@ def main():
 
     still_pending = []
     quota_hit = False
+    rejected_weak = 0
     for i, raw_deal in enumerate(batch):
         if quota_hit:
             still_pending.append(raw_deal)
@@ -362,6 +388,9 @@ def main():
             existing_slugs.add(record["slug"])
             if i < len(batch) - 1:
                 time.sleep(GEMINI_CALL_DELAY_SEC)  # spacing between calls, helps RPM limits
+        except WeakDeal as e:
+            rejected_weak += 1
+            log(f"SKIPPED weak deal ({raw_deal.get('product_url')}): {e}. Dropped from queue.")
         except QuotaExhausted:
             quota_hit = True
             still_pending.append(raw_deal)
@@ -374,19 +403,26 @@ def main():
             f"plus {len(overflow)} already-queued overflow item(s).")
     still_pending.extend(overflow)
 
-    # Render all deal pages fresh from the catalog (cheap, no API calls)
+    # Only deals meeting the cutoff get pages / index entry / sitemap entry.
+    # Weak legacy deals stay in deals_list.json (data kept) but are not rendered.
+    live_deals = [d for d in deals if is_live(d)]
+    hidden = len(deals) - len(live_deals)
+    if hidden:
+        log(f"{hidden} catalog deal(s) below {MIN_DISCOUNT_PCT}% hidden from pages/index/sitemap.")
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    for d in deals:
+    for d in live_deals:
         html = render_deal_page(d)
         (OUTPUT_DIR / f"{d['slug']}.html").write_text(html, encoding="utf-8")
 
-    (OUTPUT_DIR / "index.html").write_text(render_index(deals), encoding="utf-8")
-    (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(deals), encoding="utf-8")
+    (OUTPUT_DIR / "index.html").write_text(render_index(live_deals), encoding="utf-8")
+    (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(live_deals), encoding="utf-8")
 
     save_json(DEALS_FILE, deals)
     save_json(PENDING_FILE, still_pending)
 
-    log(f"Done. {len(deals)} total deals live. {len(still_pending)} left pending (failed/needs review).")
+    log(f"Done. {len(live_deals)} live deals ({hidden} hidden, {rejected_weak} rejected this run). "
+        f"{len(still_pending)} left pending (failed/needs review).")
 
 
 if __name__ == "__main__":
