@@ -40,7 +40,7 @@ GEMINI_MODEL = "gemini-3.6-flash"
 MAX_RETRIES = 3
 TELEGRAM_CAPTION_LIMIT = 1024
 SITE_BASE_URL = "https://successmate.in/deals"
-MAX_DEALS_PER_RUN = 5          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
+MAX_DEALS_PER_RUN = 10          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
 GEMINI_CALL_DELAY_SEC = 8      # spacing between calls within a run (helps RPM limits)
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # weak deals are never published
 
