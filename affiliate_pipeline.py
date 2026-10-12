@@ -496,23 +496,92 @@ def render_pin_helper(deals, limit=40):
     return tpl.render(deals=items)
 
 
+# ---------- categories (SEO landing pages) ----------
+# First match wins, so order matters. A category page is only built when it
+# has at least MIN_CATEGORY_DEALS live deals (no thin pages).
+MIN_CATEGORY_DEALS = 3
+CATEGORIES = [
+    {"slug": "kurta-sets-ethnic-wear", "label": "Kurta Sets & Ethnic Wear",
+     "keywords": ["kurta", "kurti", "anarkali", "dupatta", "palazzo", "saree", "nighty", "lehenga", "salwar"],
+     "intro": "Kurta sets, anarkali suits and dupatta combos from Amazon India that carry a real discount. Check the fabric, size chart and return policy on Amazon before you order."},
+    {"slug": "electronics-accessories", "label": "Electronics & Accessories",
+     "keywords": ["earbuds", "headphone", "charger", "adaptor", "adapter", "mobile stand", "tablet stand", "iphone", "galaxy", "phone case", "power bank", "cable", "speaker", "smart watch", "massager", "tds meter", "mini fan", "bluetooth"],
+     "intro": "Earbuds, phone cases, stands, adaptors and small gadgets on offer at Amazon India. Compare the price with the MRP and read the warranty terms on the product page."},
+    {"slug": "beauty-personal-care", "label": "Beauty & Personal Care",
+     "keywords": ["serum", "shampoo", "hair", "lotion", "face cream", "cream", "toothpaste", "niacinamide", "aloe", "trimmer", "shaver", "face wash", "moisturi", "sunscreen"],
+     "intro": "Skincare, haircare and grooming picks discounted on Amazon India. Check the ingredients list and your skin type before buying, and prefer sealed products sold by the brand or Amazon."},
+    {"slug": "home-kitchen", "label": "Home & Kitchen",
+     "keywords": ["garbage", "cleaning", "cleaner", "kitchen", "weighing scale", "mug", "bottle", "air fryer", "fryer", "microfiber", "storage", "tissue", "comforter", "blanket", "mattress", "sponge", "pet bowl", "bowl", "mixer"],
+     "intro": "Everyday home and kitchen deals: cleaning supplies, storage, kitchen tools and bedding with a genuine discount on Amazon India. Pack sizes differ, so compare the price per unit."},
+    {"slug": "home-decor-lights", "label": "Home Decor & Lights",
+     "keywords": ["string light", "garland", "flower", "decor", "lamp", "led light", "diya", "rangoli"],
+     "intro": "Festive lights, garlands and decor items on offer at Amazon India. Look at the length, power source and customer photos on Amazon before you order."},
+    {"slug": "bags-travel-accessories", "label": "Bags, Travel & Accessories",
+     "keywords": ["trolley", "backpack", "wallet", "umbrella", "luggage", "bag", "watch"],
+     "intro": "Trolley bags, backpacks, wallets, umbrellas and watches discounted on Amazon India. Check the size, material and warranty before you buy."},
+]
+
+
+def categorize(deal):
+    title = deal.get("title", "").lower()
+    for c in CATEGORIES:
+        if any(k in title for k in c["keywords"]):
+            return c["slug"]
+    return None
+
+
+def build_categories(live_deals):
+    groups = {}
+    for d in live_deals:
+        slug = categorize(d)
+        if slug:
+            groups.setdefault(slug, []).append(d)
+    out = {}
+    for c in CATEGORIES:
+        ds = groups.get(c["slug"], [])
+        if len(ds) >= MIN_CATEGORY_DEALS:
+            ds = sorted(ds, key=lambda x: x.get("posted_at", ""), reverse=True)
+            file = f"{c['slug']}-deals.html"
+            out[c["slug"]] = dict(c, file=file, url=f"{SITE_BASE_URL}/{file}", deals=ds,
+                                  count=len(ds), max_discount=max(int(x["discount_pct"]) for x in ds))
+    return out
+
+
+def pick_related(deal, live_deals, categories, n=6):
+    """Same-category deals first (newest), then the newest others."""
+    slug = categorize(deal)
+    others = [d for d in live_deals if d["slug"] != deal["slug"]]
+    others.sort(key=lambda x: x.get("posted_at", ""), reverse=True)
+    same = [d for d in others if slug and categorize(d) == slug]
+    rest = [d for d in others if d not in same]
+    return (same + rest)[:n]
+
+
 # ---------- rendering ----------
-def render_deal_page(deal):
+def render_deal_page(deal, related=None, category=None):
     tpl = jinja_env.get_template("deal_page_template.html")
-    return tpl.render(**deal)
+    return tpl.render(**deal, related=related or [], category=category)
 
 
-def render_index(deals):
+def render_index(deals, categories=None):
     tpl = jinja_env.get_template("index_template.html")
     ordered = sorted(deals, key=lambda d: d.get("posted_at", ""), reverse=True)
-    return tpl.render(deals=ordered)
+    return tpl.render(deals=ordered, categories=list((categories or {}).values()))
 
 
-def generate_sitemap(deals):
+def render_category_page(cat):
+    tpl = jinja_env.get_template("category_template.html")
+    updated = max((d.get("posted_at", "") for d in cat["deals"]), default="")[:10]
+    return tpl.render(cat=cat, deals=cat["deals"], updated=updated)
+
+
+def generate_sitemap(deals, extra_urls=None):
     """Simple sitemap.xml covering the deals index + every live deal page.
     Deployed to public_html/deals/sitemap.xml alongside the pages."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     urls = [(f"{SITE_BASE_URL}/", today, "1.0")]
+    for loc, lastmod, priority in (extra_urls or []):
+        urls.append((loc, lastmod, priority))
     for d in deals:
         lastmod = d.get("posted_at", "")[:10] or today
         urls.append((f"{SITE_BASE_URL}/{d['slug']}.html", lastmod, "0.8"))
@@ -627,12 +696,26 @@ def main():
         log(f"{hidden} catalog deal(s) below {MIN_DISCOUNT_PCT}% hidden from pages/index/sitemap.")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    categories = build_categories(live_deals)
     for d in live_deals:
-        html = render_deal_page(d)
+        html = render_deal_page(d, related=pick_related(d, live_deals, categories),
+                                category=categories.get(categorize(d)))
         (OUTPUT_DIR / f"{d['slug']}.html").write_text(html, encoding="utf-8")
 
-    (OUTPUT_DIR / "index.html").write_text(render_index(live_deals), encoding="utf-8")
-    (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(live_deals), encoding="utf-8")
+    cat_urls = []
+    try:  # category landing pages; a missing template must not break the run
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        for c in categories.values():
+            (OUTPUT_DIR / c["file"]).write_text(render_category_page(c), encoding="utf-8")
+            cat_urls.append((c["url"], max(d.get("posted_at", "")[:10] for d in c["deals"]) or today, "0.9"))
+        if categories:
+            log(f"{len(categories)} category page(s) built: {', '.join(categories)}")
+    except Exception as e:
+        log(f"Category pages skipped: {e}")
+        cat_urls = []
+
+    (OUTPUT_DIR / "index.html").write_text(render_index(live_deals, categories if cat_urls else {}), encoding="utf-8")
+    (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(live_deals, cat_urls), encoding="utf-8")
     try:  # private helper for manual pinning; never breaks the run
         (OUTPUT_DIR / "pin.html").write_text(render_pin_helper(live_deals), encoding="utf-8")
     except Exception as e:
