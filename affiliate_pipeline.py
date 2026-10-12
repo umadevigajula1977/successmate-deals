@@ -37,11 +37,15 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "successmate-21")
-GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+# Free-tier quota is tracked per model: when the primary is exhausted, the run
+# falls back to this one instead of stopping. Set empty ("") to disable.
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
+_exhausted_models = set()
 MAX_RETRIES = 3
 TELEGRAM_CAPTION_LIMIT = 1024
 SITE_BASE_URL = "https://successmate.in/deals"
-MAX_DEALS_PER_RUN = 10          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
+MAX_DEALS_PER_RUN = 10         # cap per run (raised from 5); Gemini free quota may defer the rest to later runs
 GEMINI_CALL_DELAY_SEC = 8      # spacing between calls within a run (helps RPM limits)
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # weak deals are never published
 
@@ -49,7 +53,7 @@ MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # weak deals are ne
 PINTEREST_ACCESS_TOKEN = os.getenv("PINTEREST_ACCESS_TOKEN")
 PINTEREST_BOARD_ID = os.getenv("PINTEREST_BOARD_ID")
 PINTEREST_API_BASE = os.getenv("PINTEREST_API_BASE", "https://api.pinterest.com/v5")
-PIN_MAX_PER_RUN = int(os.getenv("PIN_MAX_PER_RUN", "5"))
+PIN_MAX_PER_RUN = int(os.getenv("PIN_MAX_PER_RUN", "10"))
 PIN_MAX_ATTEMPTS = 3
 PIN_MAX_AGE_DAYS = int(os.getenv("PIN_MAX_AGE_DAYS", "14"))   # older unpinned deals are ignored
 PIN_INCLUDE_LEGACY = os.getenv("PIN_INCLUDE_LEGACY", "0") == "1"  # also pin deals made before this feature
@@ -92,7 +96,7 @@ def retry(fn, *args, what="call", **kwargs):
             return fn(*args, **kwargs)
         except Exception as e:
             if _is_quota_error(e):
-                log(f"{what}: Gemini quota exhausted, stopping this run early: {e}")
+                log(f"{what}: Gemini quota exhausted: {e}")
                 raise QuotaExhausted(str(e)) from e
             last_err = e
             log(f"{what} failed (attempt {attempt}/{MAX_RETRIES}): {e}")
@@ -184,6 +188,11 @@ Return ONLY valid JSON (no markdown fences, no commentary) with exactly these ke
 The pros/cons and telugu_tip must be original analysis, not copied Amazon marketing text — this is required for Amazon Associates policy compliance."""
 
 
+def _is_model_unavailable(e):
+    msg = str(e).lower()
+    return "404" in msg or "not found" in msg or "no longer available" in msg
+
+
 def enrich_with_gemini(deal):
     if genai is None:
         raise RuntimeError("google-genai package not installed")
@@ -194,13 +203,35 @@ def enrich_with_gemini(deal):
         deal_price=deal["deal_price"],
     )
 
-    def call():
-        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-        text = resp.text.strip()
-        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
-        return json.loads(text)
+    models = []
+    for m in (GEMINI_MODEL, GEMINI_FALLBACK_MODEL):
+        if m and m not in models and m not in _exhausted_models:
+            models.append(m)
 
-    return retry(call, what="Gemini enrichment")
+    last_err = None
+    for model in models:
+        def call(model=model):
+            resp = client.models.generate_content(model=model, contents=prompt)
+            text = resp.text.strip()
+            text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
+            return json.loads(text)
+
+        try:
+            return retry(call, what=f"Gemini enrichment ({model})")
+        except QuotaExhausted as e:
+            _exhausted_models.add(model)
+            log(f"Gemini model {model} quota exhausted; trying next model if any.")
+            last_err = e
+        except Exception as e:
+            if _is_model_unavailable(e):
+                _exhausted_models.add(model)
+                log(f"Gemini model {model} unavailable ({e}); trying next model if any.")
+                last_err = e
+            else:
+                raise
+    if isinstance(last_err, QuotaExhausted):
+        raise last_err
+    raise last_err or QuotaExhausted("no Gemini model available")
 
 
 # ---------- Telegram ----------
