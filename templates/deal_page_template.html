@@ -1,19 +1,23 @@
 <!DOCTYPE html>
-<html lang="te">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{{ title }} – {{ discount_pct }}% Off Deal | SuccessMate Deals</title>
+<title>{{ title|truncate(38, False, '') }} – {{ discount_pct }}% Off | SuccessMate</title>
 <meta name="description" content="{{ meta_description }}">
+<meta name="robots" content="max-image-preview:large">
 <link rel="canonical" href="https://successmate.in/deals/{{ slug }}.html">
 <meta name="theme-color" content="#0b0f1a">
 <link rel="manifest" href="/deals/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:site_name" content="SuccessMate Deals">
 <meta property="og:title" content="{{ title }} – {{ discount_pct }}% Off">
 <meta property="og:description" content="{{ meta_description }}">
 <meta property="og:image" content="{{ image_url }}">
-<meta property="og:type" content="product">
+<meta property="og:url" content="https://successmate.in/deals/{{ slug }}.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2917592456203617" crossorigin="anonymous"></script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-38L8QE6SXM"></script>
 <script>
@@ -25,17 +29,27 @@ gtag('config', 'G-38L8QE6SXM');
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Product",
-  "name": {{ title|tojson }},
-  "image": {{ image_url|tojson }},
-  "description": {{ meta_description|tojson }},
-  "offers": {
-    "@type": "Offer",
-    "priceCurrency": "INR",
-    "price": "{{ deal_price }}",
-    "availability": "https://schema.org/InStock",
-    "url": {{ affiliate_url|tojson }}
-  }
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "name": {{ title|tojson }},
+      "description": {{ meta_description|tojson }},
+      "url": "https://successmate.in/deals/{{ slug }}.html",
+      "primaryImageOfPage": {{ image_url|tojson }},
+      "datePublished": {{ posted_at|tojson }},
+      "isPartOf": {"@type": "WebSite", "name": "SuccessMate Deals", "url": "https://successmate.in/deals/"}
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://successmate.in/"},
+        {"@type": "ListItem", "position": 2, "name": "Deals", "item": "https://successmate.in/deals/"}{% if category %},
+        {"@type": "ListItem", "position": 3, "name": {{ category.label|tojson }}, "item": {{ category.url|tojson }}},
+        {"@type": "ListItem", "position": 4, "name": {{ title|tojson }}}{% else %},
+        {"@type": "ListItem", "position": 3, "name": {{ title|tojson }}}{% endif %}
+      ]
+    }
+  ]
 }
 </script>
 <style>
@@ -49,21 +63,26 @@ gtag('config', 'G-38L8QE6SXM');
 html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Telugu",sans-serif;
   padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0);}
 img{max-width:100%;display:block}
+a{color:inherit}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 100px}
 header{position:sticky;top:0;top:env(safe-area-inset-top,0);z-index:20;background:rgba(11,15,26,.92);
   backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 14px;display:flex;align-items:center;gap:10px}
 header a{color:var(--text);text-decoration:none;font-weight:800;font-size:17px}
 header a span{color:var(--accent2)}
+.crumbs{font-size:12.5px;color:var(--muted);margin:12px 0 0;line-height:1.5}
+.crumbs a{color:var(--muted);text-decoration:none}
+.crumbs a:hover{color:var(--text)}
 .badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;font-weight:700;
-  font-size:12px;padding:5px 10px;border-radius:999px;margin:14px 0 8px}
+  font-size:12px;padding:5px 10px;border-radius:999px;margin:12px 0 8px}
 .hero{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-top:10px}
 .hero img{width:100%;aspect-ratio:1/1;object-fit:contain;background:#fff}
 .pad{padding:16px}
 h1{font-size:20px;line-height:1.35;margin-bottom:10px}
-.price-row{display:flex;align-items:baseline;gap:10px;margin:8px 0 4px}
+.price-row{display:flex;align-items:baseline;gap:10px;margin:8px 0 4px;flex-wrap:wrap}
 .deal-price{font-size:28px;font-weight:800;color:var(--price)}
 .orig-price{font-size:15px;color:var(--muted);text-decoration:line-through}
 .discount{color:var(--gold);font-weight:700;font-size:14px}
+.asof{font-size:12px;color:var(--muted);margin-bottom:4px}
 .specs{list-style:none;margin:14px 0}
 .specs li{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14.5px}
 .specs li:last-child{border-bottom:none}
@@ -76,13 +95,21 @@ h1{font-size:20px;line-height:1.35;margin-bottom:10px}
 .tip-box{background:linear-gradient(135deg,#1a1030,#241536);border:1px solid #3b2158;border-radius:14px;
   padding:14px;margin-top:18px;font-size:14.5px;line-height:1.6}
 .tip-box b{color:var(--gold)}
-.ad-slot{margin:18px 0;min-height:90px;display:flex;align-items:center;justify-content:center;
-  background:var(--card);border:1px dashed var(--border);border-radius:10px;font-size:12px;color:var(--muted)}
+.tools{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:18px;font-size:14px;line-height:1.7}
+.tools a{color:var(--accent2);font-weight:700;text-decoration:none}
+.related{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rc{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;text-decoration:none;min-width:0}
+.rc img{width:100%;aspect-ratio:1/1;object-fit:cover;background:#fff}
+.rc .rb{padding:8px 10px 10px}
+.rc .rt{font-size:12.5px;line-height:1.35;min-height:calc(1.35em*2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rc .rp{color:var(--price);font-weight:800;font-size:14px;margin-top:4px}
+.rc .rd{color:var(--gold);font-size:11.5px;font-weight:700;margin-left:4px}
 .disclosure{font-size:11.5px;color:var(--muted);margin-top:16px;line-height:1.5}
 .cta-bar{position:fixed;left:0;right:0;bottom:0;bottom:env(safe-area-inset-bottom,0);z-index:30;
   background:rgba(11,15,26,.97);backdrop-filter:blur(8px);border-top:1px solid var(--border);
   padding:10px 14px calc(10px + env(safe-area-inset-bottom,0))}
 .cta-inner{max-width:640px;margin:0 auto}
+.cta-note{font-size:11px;color:var(--muted);text-align:center;margin-bottom:6px}
 .buy-btn{display:block;width:100%;text-align:center;background:linear-gradient(135deg,var(--accent),var(--accent2));
   color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:12px;text-decoration:none}
 @media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){--bg:#0b0f1a;--text:#f1f4f9} }
@@ -91,9 +118,10 @@ h1{font-size:20px;line-height:1.35;margin-bottom:10px}
 <body>
 <header><a href="/deals/">SuccessMate<span>Deals</span></a></header>
 <div class="wrap">
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> › <a href="/deals/">Deals</a>{% if category %} › <a href="/deals/{{ category.file }}">{{ category.label }}</a>{% endif %}</nav>
   <div class="badge">🔥 {{ discount_pct }}% OFF · Verified Deal</div>
   <div class="hero">
-    <img src="{{ image_url }}" alt="{{ title }}" loading="eager" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/deals/placeholder.svg';">
+    <img src="{{ image_url }}" alt="{{ title }}" loading="eager" fetchpriority="high" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/deals/placeholder.svg';">
   </div>
   <div class="pad">
     <h1>{{ title }}</h1>
@@ -102,6 +130,7 @@ h1{font-size:20px;line-height:1.35;margin-bottom:10px}
       <span class="orig-price">₹{{ original_price }}</span>
       <span class="discount">Save {{ discount_pct }}%</span>
     </div>
+    <p class="asof">Price checked on {{ posted_at[:10] }}. It may change on Amazon.</p>
 
     <div class="section-title">Key Specs</div>
     <ul class="specs">
@@ -116,14 +145,33 @@ h1{font-size:20px;line-height:1.35;margin-bottom:10px}
     <div class="section-title">Know before you buy</div>
     <ul class="cons">{% for c in cons %}<li>{{ c }}</li>{% endfor %}</ul>
 
-    <div class="tip-box"><b>తెలుగులో సలహా:</b><br>{{ telugu_tip }}</div>
+    <div class="tip-box" lang="te"><b>తెలుగులో సలహా:</b><br>{{ telugu_tip }}</div>
+
+    <div class="tools">
+      <b>Check it yourself:</b>
+      <a href="https://successmate.in/discount-calculator.html">Discount Calculator</a> to verify the real saving, or the
+      <a href="https://successmate.in/emi-calculator.html">EMI Calculator</a> if you plan to pay in instalments.
+    </div>
 
     <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-2917592456203617" data-ad-slot="3113183803" data-ad-format="auto" data-full-width-responsive="true"></ins>
 
-    <p class="disclosure">As an Amazon Associate, SuccessMate earns from qualifying purchases. Price and availability shown were accurate at the time of posting and may change on Amazon.</p>
+    {% if related %}
+    <div class="section-title">More deals you may like</div>
+    <div class="related">
+      {% for r in related %}
+      <a class="rc" href="/deals/{{ r.slug }}.html">
+        <img src="{{ r.image_url }}" alt="{{ r.title }}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/deals/placeholder.svg';">
+        <div class="rb"><div class="rt">{{ r.title }}</div><div><span class="rp">₹{{ r.deal_price }}</span><span class="rd">{{ r.discount_pct }}% OFF</span></div></div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <p class="disclosure">As an Amazon Associate, SuccessMate earns from qualifying purchases. The buy button is an affiliate link: we may earn a commission at no extra cost to you. Price and availability were accurate when checked and may change on Amazon.</p>
   </div>
 </div>
 <div class="cta-bar"><div class="cta-inner">
+  <div class="cta-note">Affiliate link · price may change</div>
   <a class="buy-btn" href="{{ affiliate_url }}" target="_blank" rel="nofollow sponsored noopener">Buy Now on Amazon →</a>
 </div></div>
 <script>
