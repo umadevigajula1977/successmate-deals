@@ -5,13 +5,14 @@ Reads data/pending_deals.json -> Gemini enriches -> renders deal pages +
 index -> posts to Telegram -> updates data/deals_list.json.
 Output HTML goes to output/ ; a GitHub Action rsyncs output/ to Hostinger.
 """
+import base64
 import json
 import os
 import re
 import sys
 import time
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode, quote, unquote
 
@@ -40,9 +41,19 @@ GEMINI_MODEL = "gemini-3.6-flash"
 MAX_RETRIES = 3
 TELEGRAM_CAPTION_LIMIT = 1024
 SITE_BASE_URL = "https://successmate.in/deals"
-MAX_DEALS_PER_RUN = 10          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
+MAX_DEALS_PER_RUN = 5          # agreed cap: don't spam Telegram, don't blow the free Gemini quota
 GEMINI_CALL_DELAY_SEC = 8      # spacing between calls within a run (helps RPM limits)
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # weak deals are never published
+
+# Pinterest (optional: skipped silently if the two secrets are not set)
+PINTEREST_ACCESS_TOKEN = os.getenv("PINTEREST_ACCESS_TOKEN")
+PINTEREST_BOARD_ID = os.getenv("PINTEREST_BOARD_ID")
+PINTEREST_API_BASE = os.getenv("PINTEREST_API_BASE", "https://api.pinterest.com/v5")
+PIN_MAX_PER_RUN = int(os.getenv("PIN_MAX_PER_RUN", "5"))
+PIN_MAX_ATTEMPTS = 3
+PIN_MAX_AGE_DAYS = int(os.getenv("PIN_MAX_AGE_DAYS", "14"))   # older unpinned deals are ignored
+PIN_INCLUDE_LEGACY = os.getenv("PIN_INCLUDE_LEGACY", "0") == "1"  # also pin deals made before this feature
+PIN_DELAY_SEC = 2
 
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
@@ -282,6 +293,144 @@ def send_telegram(image_url, text):
     return retry(call, what="Telegram post")
 
 
+# ---------- Pinterest ----------
+def pinterest_enabled():
+    return bool(PINTEREST_ACCESS_TOKEN and PINTEREST_BOARD_ID)
+
+
+def build_pin_description(deal):
+    text = (
+        f"{deal['title']}\n\n"
+        f"{deal['discount_pct']}% OFF - \u20b9{deal['deal_price']} (MRP \u20b9{deal['original_price']})\n"
+        "Price may change. Full details and buying link on SuccessMate Deals.\n\n"
+        "#AmazonDeals #Ad #CommissionsEarned #SuccessMateDeals"
+    )
+    return text[:800]
+
+
+def _sniff_image_type(data):
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    return None
+
+
+def page_is_live(url):
+    try:
+        r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+        return r.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def create_pin(deal):
+    """Returns ("ok", pin_id) | ("failed", message) | ("auth", message).
+    Pin links to OUR deal page (ads + full content), never straight to Amazon.
+    Uses its own small retry loop: the shared retry() treats any '429' as a
+    Gemini quota error and would abort the whole run."""
+    page_url = f"{SITE_BASE_URL}/{deal['slug']}.html"
+
+    media = None
+    try:
+        img = download_image(deal["image_url"])
+        ctype = _sniff_image_type(img)
+        if ctype:
+            media = {"source_type": "image_base64", "content_type": ctype,
+                     "data": base64.b64encode(img).decode("ascii")}
+    except Exception as e:
+        log(f"Pinterest: image download failed, falling back to URL: {e}")
+    if media is None:
+        media = {"source_type": "image_url", "url": deal["image_url"]}
+
+    body = {
+        "board_id": PINTEREST_BOARD_ID,
+        "title": deal["title"][:100],
+        "description": build_pin_description(deal),
+        "alt_text": deal["title"][:500],
+        "link": page_url,
+        "media_source": media,
+    }
+    headers = {"Authorization": f"Bearer {PINTEREST_ACCESS_TOKEN}",
+               "Content-Type": "application/json"}
+
+    last = "unknown error"
+    for attempt in range(1, 4):
+        try:
+            r = requests.post(f"{PINTEREST_API_BASE}/pins", headers=headers, json=body, timeout=60)
+        except requests.RequestException as e:
+            last = str(e)
+            time.sleep(2 * attempt)
+            continue
+        if r.status_code in (200, 201):
+            return "ok", str(r.json().get("id", ""))
+        if r.status_code in (401, 403):
+            return "auth", f"HTTP {r.status_code}: {r.text[:200]}"
+        last = f"HTTP {r.status_code}: {r.text[:200]}"
+        if r.status_code == 429 or r.status_code >= 500:
+            try:
+                wait = float(r.headers.get("Retry-After", ""))
+            except ValueError:
+                wait = 2 * attempt
+            time.sleep(min(wait, 30))
+            continue
+        return "failed", last
+    return "failed", last
+
+
+def run_pinterest(deals):
+    """Pins live deals whose page is already deployed. New deals start as
+    'pending' and are pinned on a later run (after the site deploy), so
+    Pinterest never crawls a 404. Never raises: Pinterest problems must not
+    break the Telegram/site pipeline."""
+    if not pinterest_enabled():
+        log("Pinterest not configured (PINTEREST_ACCESS_TOKEN / PINTEREST_BOARD_ID); skipping pins.")
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(days=PIN_MAX_AGE_DAYS)
+    todo = []
+    for d in deals:
+        if not is_live(d) or d.get("pinterest_status") == "ok":
+            continue
+        if d.get("pinterest_status") is None and not PIN_INCLUDE_LEGACY:
+            continue
+        if int(d.get("pinterest_attempts", 0)) >= PIN_MAX_ATTEMPTS:
+            continue
+        try:
+            posted = datetime.fromisoformat(d.get("posted_at", ""))
+        except ValueError:
+            continue
+        if posted.tzinfo is None:
+            posted = posted.replace(tzinfo=timezone.utc)
+        if posted < cutoff:
+            continue
+        todo.append((posted, d))
+    todo.sort(key=lambda x: x[0])  # oldest first, so nothing starves
+    todo = todo[:PIN_MAX_PER_RUN]
+    if not todo:
+        log("Pinterest: nothing to pin this run.")
+        return
+
+    for i, (_, d) in enumerate(todo):
+        page_url = f"{SITE_BASE_URL}/{d['slug']}.html"
+        if not page_is_live(page_url):
+            log(f"Pinterest: page not live yet, will pin next run: {page_url}")
+            continue
+        status, info = create_pin(d)
+        if status == "ok":
+            d["pinterest_status"] = "ok"
+            d["pinterest_pin_id"] = info
+            log(f"Pinned to Pinterest: {d['title']} ({info})")
+        elif status == "auth":
+            log(f"Pinterest auth/permission error, stopping pins this run: {info}")
+            return  # attempts not counted: retried once the token is fixed
+        else:
+            d["pinterest_status"] = "failed"
+            d["pinterest_attempts"] = int(d.get("pinterest_attempts", 0)) + 1
+            log(f"Pinterest pin failed ({d['title']}): {info}")
+        if i < len(todo) - 1:
+            time.sleep(PIN_DELAY_SEC)
+
+
 # ---------- rendering ----------
 def render_deal_page(deal):
     tpl = jinja_env.get_template("deal_page_template.html")
@@ -347,6 +496,8 @@ def process_deal(raw_deal, existing_slugs):
         "deal_price": deal_price,
         "discount_pct": discount_pct,
         "posted_at": datetime.now(timezone.utc).isoformat(),
+        "pinterest_status": "pending",
+        "pinterest_attempts": 0,
     }
 
     # Telegram — link goes to OUR deal page (ads + full content), not straight to Amazon
@@ -417,6 +568,11 @@ def main():
 
     (OUTPUT_DIR / "index.html").write_text(render_index(live_deals), encoding="utf-8")
     (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(live_deals), encoding="utf-8")
+
+    try:
+        run_pinterest(deals)
+    except Exception as e:
+        log(f"Pinterest step failed (ignored): {e}")
 
     save_json(DEALS_FILE, deals)
     save_json(PENDING_FILE, still_pending)
