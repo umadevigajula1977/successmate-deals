@@ -40,13 +40,13 @@ AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "successmate-21")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 # Free-tier quota is tracked per model: when the primary is exhausted, the run
 # falls back to this one instead of stopping. Set empty ("") to disable.
-GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.8-flash")
 _exhausted_models = set()
 MAX_RETRIES = 3
 TELEGRAM_CAPTION_LIMIT = 1024
 SITE_BASE_URL = "https://successmate.in/deals"
 MAX_DEALS_PER_RUN = 10         # cap per run (raised from 5); Gemini free quota may defer the rest to later runs
-GEMINI_CALL_DELAY_SEC = 8      # spacing between calls within a run (helps RPM limits)
+GEMINI_CALL_DELAY_SEC = 13     # free tier = 5 requests/minute per model -> >= 12s between calls
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # weak deals are never published
 
 # Pinterest (optional: skipped silently if the two secrets are not set)
@@ -85,17 +85,32 @@ def _is_quota_error(e):
     return "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower()
 
 
+def _quota_retry_delay(e):
+    """Seconds to wait if this is a PER-MINUTE Gemini quota error (recoverable),
+    else None (per-day / unknown quota: waiting won't help)."""
+    msg = str(e)
+    if "PerMinute" not in msg:
+        return None
+    m = re.search(r"retry in ([\d.]+)s", msg) or re.search(r"'retryDelay': '(\d+)s'", msg)
+    delay = float(m.group(1)) if m else 20.0
+    return delay + 1 if delay <= 65 else None
+
+
 def retry(fn, *args, what="call", **kwargs):
-    """Simple exponential-backoff retry: 2s, 4s, 8s. Quota errors skip the
-    backoff entirely and raise QuotaExhausted immediately — waiting a few
-    seconds never helps against a daily quota, so failing fast preserves
-    the remaining retry budget for genuinely transient errors."""
+    """Exponential-backoff retry: 2s, 4s, 8s. Gemini PER-MINUTE quota errors wait
+    out the suggested delay and retry; PER-DAY quota errors raise QuotaExhausted
+    immediately (waiting never helps)."""
     last_err = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             return fn(*args, **kwargs)
         except Exception as e:
-            if _is_quota_error(e):
+            if what.startswith("Gemini") and _is_quota_error(e):
+                delay = _quota_retry_delay(e)
+                if delay and attempt < MAX_RETRIES:
+                    log(f"{what}: per-minute quota hit, waiting {delay:.0f}s (attempt {attempt}/{MAX_RETRIES})")
+                    time.sleep(delay)
+                    continue
                 log(f"{what}: Gemini quota exhausted: {e}")
                 raise QuotaExhausted(str(e)) from e
             last_err = e
@@ -190,7 +205,8 @@ The pros/cons and telugu_tip must be original analysis, not copied Amazon market
 
 def _is_model_unavailable(e):
     msg = str(e).lower()
-    return "404" in msg or "not found" in msg or "no longer available" in msg
+    return ("404" in msg or "not found" in msg or "no longer available" in msg
+            or "503" in msg or "unavailable" in msg)
 
 
 def enrich_with_gemini(deal):
@@ -462,6 +478,24 @@ def run_pinterest(deals):
             time.sleep(PIN_DELAY_SEC)
 
 
+# ---------- manual Pinterest helper page ----------
+def pin_create_url(deal):
+    """Official Pinterest 'Pin It' URL: opens Pinterest's create-pin dialog
+    prefilled. Works with a normal account (no API, no approval)."""
+    page_url = f"{SITE_BASE_URL}/{deal['slug']}.html"
+    return ("https://www.pinterest.com/pin/create/button/?url=" + quote(page_url, safe="")
+            + "&media=" + quote(deal["image_url"], safe="")
+            + "&description=" + quote(build_pin_description(deal), safe=""))
+
+
+def render_pin_helper(deals, limit=40):
+    tpl = jinja_env.get_template("pin_helper_template.html")
+    ordered = sorted(deals, key=lambda d: d.get("posted_at", ""), reverse=True)[:limit]
+    items = [dict(d, pin_url=pin_create_url(d), pin_text=build_pin_description(d),
+                  page_url=f"{SITE_BASE_URL}/{d['slug']}.html") for d in ordered]
+    return tpl.render(deals=items)
+
+
 # ---------- rendering ----------
 def render_deal_page(deal):
     tpl = jinja_env.get_template("deal_page_template.html")
@@ -599,6 +633,10 @@ def main():
 
     (OUTPUT_DIR / "index.html").write_text(render_index(live_deals), encoding="utf-8")
     (OUTPUT_DIR / "sitemap.xml").write_text(generate_sitemap(live_deals), encoding="utf-8")
+    try:  # private helper for manual pinning; never breaks the run
+        (OUTPUT_DIR / "pin.html").write_text(render_pin_helper(live_deals), encoding="utf-8")
+    except Exception as e:
+        log(f"Pin helper page skipped: {e}")
 
     try:
         run_pinterest(deals)
