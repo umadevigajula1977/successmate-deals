@@ -198,6 +198,7 @@ Return ONLY valid JSON (no markdown fences, no commentary) with exactly these ke
   "cons": ["1 to 3 short honest cons or things to check before buying"],
   "meta_description": "1 sentence, under 155 chars, for SEO meta description",
   "telugu_tip": "2 to 3 sentences in natural Telugu script giving a genuine buying tip or who this product suits best",
+  "category_slug": "Exactly ONE slug from this list, chosen by what the product IS (not by words in its title), or other if none fits: {category_options}",
   "telegram_caption": "A SHORT, punchy Telegram deal alert. Product name + 1 emoji, then exactly 2 key highlights as short phrases (not full sentences), then one line starting with '💡 తెలుగులో:' with a 1-line Telugu tip. Do NOT include the URL or price in this field, those are added separately. Hard limit: 250 characters total."
 }}
 The pros/cons and telugu_tip must be original analysis, not copied Amazon marketing text — this is required for Amazon Associates policy compliance."""
@@ -217,6 +218,7 @@ def enrich_with_gemini(deal):
         raw_text=deal["raw_text"],
         original_price=deal["original_price"],
         deal_price=deal["deal_price"],
+        category_options=", ".join([f"{c['slug']} ({c['label']})" for c in CATEGORIES] + ["other"]),
     )
 
     models = []
@@ -523,6 +525,13 @@ CATEGORIES = [
 
 
 def categorize(deal):
+    """Gemini's stored category wins; 'other' means no category page; deals
+    without a valid stored category (older deals) fall back to title keywords."""
+    stored = deal.get("category_slug")
+    if stored == "other":
+        return None
+    if stored in {c["slug"] for c in CATEGORIES}:
+        return stored
     title = deal.get("title", "").lower()
     for c in CATEGORIES:
         if any(k in title for k in c["keywords"]):
@@ -560,7 +569,8 @@ def pick_related(deal, live_deals, categories, n=6):
 # ---------- rendering ----------
 def render_deal_page(deal, related=None, category=None):
     tpl = jinja_env.get_template("deal_page_template.html")
-    return tpl.render(**deal, related=related or [], category=category)
+    ctx = {k: v for k, v in deal.items() if k not in ("related", "category")}  # reserved template names
+    return tpl.render(**ctx, related=related or [], category=category)
 
 
 def render_index(deals, categories=None):
@@ -569,10 +579,11 @@ def render_index(deals, categories=None):
     return tpl.render(deals=ordered, categories=list((categories or {}).values()))
 
 
-def render_category_page(cat):
+def render_category_page(cat, categories=None, total=0):
     tpl = jinja_env.get_template("category_template.html")
     updated = max((d.get("posted_at", "") for d in cat["deals"]), default="")[:10]
-    return tpl.render(cat=cat, deals=cat["deals"], updated=updated)
+    return tpl.render(cat=cat, deals=cat["deals"], updated=updated,
+                      categories=list((categories or {}).values()), total=total)
 
 
 def generate_sitemap(deals, extra_urls=None):
@@ -615,6 +626,11 @@ def process_deal(raw_deal, existing_slugs):
     image_url = normalize_url(raw_deal["image_url"])
 
     slug = unique_slug(slugify(enriched["clean_title"]), existing_slugs)
+    valid_cats = {c["slug"] for c in CATEGORIES} | {"other"}
+    category = enriched.get("category_slug")
+    category = category.strip().lower() if isinstance(category, str) else None
+    if category not in valid_cats:
+        category = None  # invalid answer: fall back to keyword matching at render time
 
     deal_record = {
         "slug": slug,
@@ -629,6 +645,7 @@ def process_deal(raw_deal, existing_slugs):
         "original_price": original_price,
         "deal_price": deal_price,
         "discount_pct": discount_pct,
+        "category_slug": category,  # not "category": that name is a template variable
         "posted_at": datetime.now(timezone.utc).isoformat(),
         "pinterest_status": "pending",
         "pinterest_attempts": 0,
@@ -706,7 +723,7 @@ def main():
     try:  # category landing pages; a missing template must not break the run
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for c in categories.values():
-            (OUTPUT_DIR / c["file"]).write_text(render_category_page(c), encoding="utf-8")
+            (OUTPUT_DIR / c["file"]).write_text(render_category_page(c, categories, len(live_deals)), encoding="utf-8")
             cat_urls.append((c["url"], max(d.get("posted_at", "")[:10] for d in c["deals"]) or today, "0.9"))
         if categories:
             log(f"{len(categories)} category page(s) built: {', '.join(categories)}")
