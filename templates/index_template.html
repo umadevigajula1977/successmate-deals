@@ -29,7 +29,8 @@ header{position:sticky;top:0;top:env(safe-area-inset-top,0);z-index:20;backgroun
   display:flex;justify-content:space-between;align-items:center}
 header .logo{font-weight:800;font-size:17px}
 header .logo span{color:var(--accent2)}
-header nav a{font-size:13px;color:var(--muted);margin-left:14px}
+header nav a{font-size:13px;color:var(--accent2);font-weight:700;margin-left:14px}
+header nav a:hover{text-decoration:underline}
 .wrap{max-width:1280px;margin:0 auto;padding:0 14px 40px}
 .hero{text-align:center;padding:26px 10px 14px}
 .badge{display:inline-flex;gap:6px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;
@@ -58,6 +59,7 @@ header nav a{font-size:13px;color:var(--muted);margin-left:14px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:0 auto 14px;max-width:820px}
 .chip{background:var(--card);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:7px 12px;border-radius:999px}
 .chip:hover{border-color:var(--accent2)}
+.chip.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
 .ad-slot{margin:20px 0;min-height:90px}
 .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;font-size:14px}
 </style>
@@ -74,7 +76,7 @@ header nav a{font-size:13px;color:var(--muted);margin-left:14px}
     <p>ఎలక్ట్రానిక్స్, స్మార్ట్‌ఫోన్స్ మరియు హోమ్ అప్లయన్సెస్ బయ్యింగ్ గైడ్స్ (తెలుగులో)</p>
   </div>
   <div class="search"><input id="q" placeholder="Search deals... (e.g. Samsung, headphones)"></div>
-  {% if categories %}<nav class="chips" aria-label="Deal categories">{% for c in categories %}<a class="chip" href="/deals/{{ c.file }}">{{ c.label }} ({{ c.count }})</a>{% endfor %}</nav>{% endif %}
+  {% if categories %}<nav class="chips" aria-label="Deal categories"><a class="chip on" href="/deals/">All ({{ deals|length }})</a>{% for c in categories %}<a class="chip" href="/deals/{{ c.file }}">{{ c.label }} ({{ c.count }})</a>{% endfor %}</nav>{% endif %}
   <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-2917592456203617" data-ad-slot="3113183803" data-ad-format="auto" data-full-width-responsive="true"></ins>
   {% set MIN_DISCOUNT = 20 %}
   <div class="grid" id="grid">
