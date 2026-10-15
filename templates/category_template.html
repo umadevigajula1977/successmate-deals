@@ -116,6 +116,7 @@ h1{font-size:24px;margin:14px 0 8px;line-height:1.3}
     {% endfor %}
   </div>
   <p class="more">See every offer on the <a href="/deals/">all deals page</a>, or use the free <a href="https://successmate.in/discount-calculator.html">Discount Calculator</a> to check a saving yourself.</p>
+  {% if cat.note %}<p class="disclosure">{{ cat.note }}</p>{% endif %}
   <p class="disclosure">As an Amazon Associate, SuccessMate earns from qualifying purchases. Links to Amazon are affiliate links: we may earn a commission at no extra cost to you. Price and availability were accurate when checked and may change on Amazon.</p>
 </div>
 <script>
