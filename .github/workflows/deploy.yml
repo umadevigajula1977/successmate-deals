@@ -68,3 +68,14 @@ jobs:
           done
           echo "All 3 deploy attempts failed."
           exit 1
+
+      - name: Generate and post Telegram Shorts
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-core
+          pip install -q edge-tts pillow
+          python generate_shorts.py
