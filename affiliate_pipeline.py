@@ -201,7 +201,8 @@ Return ONLY valid JSON (no markdown fences, no commentary) with exactly these ke
   "category_slug": "Exactly ONE slug from this list, chosen by what the product IS (not by words in its title), or other if none fits: {category_options}",
   "telegram_caption": "A SHORT, punchy Telegram deal alert. Product name + 1 emoji, then exactly 2 key highlights as short phrases (not full sentences), then one line starting with '💡 తెలుగులో:' with a 1-line Telugu tip. Do NOT include the URL or price in this field, those are added separately. Hard limit: 250 characters total."
 }}
-The pros/cons and telugu_tip must be original analysis, not copied Amazon marketing text — this is required for Amazon Associates policy compliance."""
+The pros/cons and telugu_tip must be original analysis, not copied Amazon marketing text — this is required for Amazon Associates policy compliance.
+HEALTH RULE: for any health, fitness, supplement or medical-device product, describe features only. Never claim it cures, treats, prevents, relieves or lowers anything, never promise results, and never mention diseases or conditions. For supplements and medical devices, include a con like "check with a doctor before use"."""
 
 
 def _is_model_unavailable(e):
@@ -512,6 +513,10 @@ CATEGORIES = [
     {"slug": "beauty-personal-care", "label": "Beauty & Personal Care",
      "keywords": ["serum", "shampoo", "hair", "lotion", "face cream", "cream", "toothpaste", "niacinamide", "aloe", "trimmer", "shaver", "face wash", "moisturi", "sunscreen"],
      "intro": "Skincare, haircare and grooming picks discounted on Amazon India. Check the ingredients list and your skin type before buying, and prefer sealed products sold by the brand or Amazon."},
+    {"slug": "health-wellness", "label": "Health & Wellness",
+     "keywords": ["yoga", "dumbbell", "resistance band", "skipping rope", "gym", "fitness", "protein", "vitamin", "supplement", "bp monitor", "blood pressure", "glucometer", "thermometer", "oximeter", "nebulizer", "heating pad", "hot water bag", "knee support", "back support", "posture", "exercise"],
+     "intro": "Fitness gear, home health monitors and everyday wellness basics discounted on Amazon India. Compare features and read the product page before you buy.",
+     "note": "General shopping information, not medical advice. Talk to a qualified doctor before using any health product."},
     {"slug": "home-kitchen", "label": "Home & Kitchen",
      "keywords": ["garbage", "cleaning", "cleaner", "kitchen", "weighing scale", "mug", "bottle", "air fryer", "fryer", "microfiber", "storage", "tissue", "comforter", "blanket", "mattress", "sponge", "pet bowl", "bowl", "mixer"],
      "intro": "Everyday home and kitchen deals: cleaning supplies, storage, kitchen tools and bedding with a genuine discount on Amazon India. Pack sizes differ, so compare the price per unit."},
@@ -678,6 +683,7 @@ def main():
             f"(cap: {MAX_DEALS_PER_RUN}/run).")
 
     still_pending = []
+    new_records = []
     quota_hit = False
     rejected_weak = 0
     for i, raw_deal in enumerate(batch):
@@ -687,6 +693,7 @@ def main():
         try:
             record = process_deal(raw_deal, existing_slugs)
             deals.append(record)
+            new_records.append(record)
             existing_slugs.add(record["slug"])
             if i < len(batch) - 1:
                 time.sleep(GEMINI_CALL_DELAY_SEC)  # spacing between calls, helps RPM limits
@@ -745,6 +752,7 @@ def main():
 
     save_json(DEALS_FILE, deals)
     save_json(PENDING_FILE, still_pending)
+    save_json(DATA_DIR / "new_deals.json", new_records)  # read by generate_shorts.py; not committed
 
     log(f"Done. {len(live_deals)} live deals ({hidden} hidden, {rejected_weak} rejected this run). "
         f"{len(still_pending)} left pending (failed/needs review).")
